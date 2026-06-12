@@ -1,1 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DESERT RAGE — Offroad Sim</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0705; overflow: hidden; font-family: 'Courier New', monospace; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10;
+  }
+  #speed-panel {
+    position: absolute; bottom: 32px; right: 36px;
+    color: #f4a940; text-align: right;
+  }
+  #speed-num {
+    font-size: 72px; font-weight: 900; line-height: 1;
+    text-shadow: 0 0 30px #f4a94088;
+    letter-spacing: -2px;
+  }
+  #speed-unit { font-size: 13px; letter-spacing: 4px; opacity: .6; margin-top: 2px; }
+  #gear-panel {
+    position: absolute; bottom: 32px; left: 36px;
+    color: #e8dcc8;
+  }
+  #gear-label { font-size: 11px; letter-spacing: 3px; opacity: .5; margin-bottom: 4px; }
+  #gear-num { font-size: 48px; font-weight: 900; color: #f4a940; text-shadow: 0 0 20px #f4a94066; }
+  #title-bar {
+    position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
+    color: #e8dcc8; letter-spacing: 8px; font-size: 13px; opacity: .45;
+    text-transform: uppercase;
+  }
+  #controls-hint {
+    position: absolute; top: 24px; left: 28px;
+    color: #e8dcc8; font-size: 10px; letter-spacing: 2px; opacity: .4;
+    line-height: 1.9;
+  }
+  #damage-bar-wrap {
+    position: absolute; bottom: 110px; right: 36px;
+    width: 140px;
+  }
+  #damage-label { font-size: 10px; letter-spacing: 3px; color: #e8dcc8; opacity: .45; margin-bottom: 5px; text-align: right; }
+  #damage-bar-bg {
+    height: 6px; background: #2a2015; border-radius: 3px; overflow: hidden;
+  }
+  #damage-bar {
+    height: 100%; width: 100%; background: #4caf50;
+    border-radius: 3px; transition: background .3s;
+  }
+  #nitro-bar-wrap {
+    position: absolute; bottom: 80px; right: 36px;
+    width: 140px;
+  }
+  #nitro-label { font-size: 10px; letter-spacing: 3px; color: #e8dcc8; opacity: .45; margin-bottom: 5px; text-align: right; }
+  #nitro-bar-bg {
+    height: 6px; background: #2a2015; border-radius: 3px; overflow: hidden;
+  }
+  #nitro-bar {
+    height: 100%; width: 100%; background: #00cfff;
+    border-radius: 3px;
+  }
+  #dist-panel {
+    position: absolute; top: 24px; right: 36px;
+    color: #e8dcc8; text-align: right;
+    font-size: 11px; letter-spacing: 2px; opacity: .5;
+  }
+  #dist-num { font-size: 22px; font-weight: 700; color: #f4a940; opacity: 1; }
+  #crash-msg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: #ff4422; font-size: 42px; font-weight: 900; letter-spacing: 6px;
+    text-shadow: 0 0 40px #ff442288;
+    display: none; text-align: center;
+  }
+  #crash-sub {
+    font-size: 13px; letter-spacing: 4px; color: #e8dcc8;
+    margin-top: 12px; opacity: .7;
+  }
+  .vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, transparent 55%, #0a070588 100%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="vignette"></div>
+  <div id="title-bar">DESERT RAGE</div>
+  <div id="controls-hint">
+    W / ↑ &nbsp; THROTTLE<br>
+    S / ↓ &nbsp; BRAKE<br>
+    A / ← &nbsp; STEER LEFT<br>
+    D / → &nbsp; STEER RIGHT<br>
+    SHIFT &nbsp; NITRO<br>
+    R &nbsp;&nbsp;&nbsp;&nbsp; RESPAWN
+  </div>
+  <div id="dist-panel">
+    <div>DISTANCE</div>
+    <div id="dist-num">0 m</div>
+  </div>
+  <div id="gear-panel">
+    <div id="gear-label">GEAR</div>
+    <div id="gear-num">1</div>
+  </div>
+  <div id="speed-panel">
+    <div id="speed-num">0</div>
+    <div id="speed-unit">KM/H</div>
+  </div>
+  <div id="damage-bar-wrap">
+    <div id="damage-label">HEALTH</div>
+    <div id="damage-bar-bg"><div id="damage-bar"></div></div>
+  </div>
+  <div id="nitro-bar-wrap">
+    <div id="nitro-label">NITRO</div>
+    <div id="nitro-bar-bg"><div id="nitro-bar"></div></div>
+  </div>
+  <div id="crash-msg">
+    WRECKED<br>
+    <div id="crash-sub">PRESS R TO RESPAWN</div>
+  </div>
+</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── SCENE SETUP ────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fa8c8);
+scene.fog = new THREE.Fog(0xc4a882, 60, 260);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 400);
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── LIGHTING ────────────────────────────────────────────────────────────────
+const sun = new THREE.DirectionalLight(0xfff0cc, 2.2);
+sun.position.set(60, 90, 40);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 400;
+sun.shadow.camera.left = -120;
+sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120;
+sun.shadow.camera.bottom = -120;
+sun.shadow.bias = -0.0003;
+scene.add(sun);
+
+const ambient = new THREE.AmbientLight(0x7090b0, 0.55);
+scene.add(ambient);
+
+const fillLight = new THREE.DirectionalLight(0x4466aa, 0.35);
+fillLight.position.set(-30, 20, -20);
+scene.add(fillLight);
+
+// ── MATERIALS ───────────────────────────────────────────────────────────────
+const MAT = {
+  sand:    new THREE.MeshLambertMaterial({ color: 0xc8a86a }),
+  sandDark:new THREE.MeshLambertMaterial({ color: 0xb09050 }),
+  rock:    new THREE.MeshLambertMaterial({ color: 0x857060 }),
+  rockDark:new THREE.MeshLambertMaterial({ color: 0x6a5040 }),
+  bush:    new THREE.MeshLambertMaterial({ color: 0x7a8a40 }),
+  bushDark:new THREE.MeshLambertMaterial({ color: 0x556030 }),
+  carBody: new THREE.MeshLambertMaterial({ color: 0xe05020 }),
+  carRoof: new THREE.MeshLambertMaterial({ color: 0xc03010 }),
+  carGlass:new THREE.MeshLambertMaterial({ color: 0x88bbdd, transparent: true, opacity: 0.7 }),
+  wheel:   new THREE.MeshLambertMaterial({ color: 0x222222 }),
+  wheelHub:new THREE.MeshLambertMaterial({ color: 0x999999 }),
+  exhaust: new THREE.MeshLambertMaterial({ color: 0x444444 }),
+  undercarriage: new THREE.MeshLambertMaterial({ color: 0x333333 }),
+  skidmark: new THREE.MeshLambertMaterial({ color: 0x332211, transparent: true, opacity: 0.5 }),
+};
+
+// ── TERRAIN CHUNK SYSTEM ────────────────────────────────────────────────────
+const CHUNK_SIZE = 80;
+const CHUNK_RANGE = 3; // render 7x7 around player
+const chunks = new Map();
+
+function chunkKey(cx, cz) { return `${cx},${cz}`; }
+
+function seededRand(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function getTerrainY(x, z) {
+  // Simple layered sine waves for dunes
+  return (
+    Math.sin(x * 0.04 + z * 0.02) * 3.5 +
+    Math.sin(x * 0.015 - z * 0.03) * 5 +
+    Math.cos(x * 0.025 + z * 0.025) * 2.5 +
+    Math.sin(x * 0.08 + z * 0.05) * 0.8
+  );
+}
+
+function buildGroundPatch(cx, cz) {
+  const segs = 20;
+  const geo = new THREE.PlaneGeometry(CHUNK_SIZE, CHUNK_SIZE, segs, segs);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const wx = pos.getX(i) + cx * CHUNK_SIZE;
+    const wz = pos.getZ(i) + cz * CHUNK_SIZE;
+    pos.setZ(i, getTerrainY(wx, wz)); // plane is XY, rotate later
+  }
+  geo.rotateX(-Math.PI / 2);
+  geo.computeVertexNormals();
+  // Alternate sand colors
+  const rng = seededRand(cx * 31337 + cz * 7331 + 42);
+  const mat = rng() > 0.4 ? MAT.sand : MAT.sandDark;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function makeRock(rng) {
+  const h = 1.5 + rng() * 5;
+  const w = 1 + rng() * 3.5;
+  const d = 1 + rng() * 3;
+  const geo = new THREE.DodecahedronGeometry(1, 0);
+  // Scale non-uniformly
+  const mesh = new THREE.Mesh(geo, rng() > 0.5 ? MAT.rock : MAT.rockDark);
+  mesh.scale.set(w, h, d);
+  mesh.rotation.y = rng() * Math.PI * 2;
+  mesh.rotation.x = (rng() - 0.5) * 0.4;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.isObstacle = true;
+  mesh.userData.radius = Math.max(w, d) * 0.7;
+  return mesh;
+}
+
+function makeBush(rng) {
+  const group = new THREE.Group();
+  const spheres = 2 + Math.floor(rng() * 3);
+  for (let i = 0; i < spheres; i++) {
+    const r = 0.4 + rng() * 0.7;
+    const geo = new THREE.SphereGeometry(r, 5, 4);
+    const mat = rng() > 0.5 ? MAT.bush : MAT.bushDark;
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set((rng() - 0.5) * 1.2, r * 0.5, (rng() - 0.5) * 1.2);
+    m.castShadow = true;
+    group.add(m);
+  }
+  group.userData.isObstacle = true;
+  group.userData.radius = 0.9;
+  return group;
+}
+
+function makeCactus(rng) {
+  const group = new THREE.Group();
+  const h = 2 + rng() * 3;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, h, 6), MAT.bush);
+  body.position.y = h / 2;
+  body.castShadow = true;
+  group.add(body);
+  if (rng() > 0.4) {
+    const armH = 0.8 + rng() * 1.2;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, armH, 5), MAT.bush);
+    arm.position.set(0.55, h * 0.55, 0);
+    arm.rotation.z = -Math.PI / 4;
+    arm.castShadow = true;
+    group.add(arm);
+  }
+  group.userData.isObstacle = true;
+  group.userData.radius = 0.5;
+  return group;
+}
+
+function buildChunk(cx, cz) {
+  const group = new THREE.Group();
+  const ground = buildGroundPatch(cx, cz);
+  group.add(ground);
+
+  const rng = seededRand(cx * 99991 + cz * 39989 + 123);
+  const count = 8 + Math.floor(rng() * 14);
+  for (let i = 0; i < count; i++) {
+    const lx = (rng() - 0.5) * CHUNK_SIZE;
+    const lz = (rng() - 0.5) * CHUNK_SIZE;
+    const wx = cx * CHUNK_SIZE + lx;
+    const wz = cz * CHUNK_SIZE + lz;
+    const y = getTerrainY(wx, wz);
+
+    let obj;
+    const t = rng();
+    if (t < 0.35) obj = makeRock(rng);
+    else if (t < 0.70) obj = makeBush(rng);
+    else obj = makeCactus(rng);
+
+    obj.position.set(lx, y, lz);
+    group.add(obj);
+  }
+
+  group.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
+  scene.add(group);
+  chunks.set(chunkKey(cx, cz), group);
+
+  // Store obstacle list for collision
+  group.userData.obstacles = [];
+  group.children.slice(1).forEach(child => {
+    if (child.userData.isObstacle) {
+      group.userData.obstacles.push({
+        obj: child,
+        wx: cx * CHUNK_SIZE + child.position.x,
+        wz: cz * CHUNK_SIZE + child.position.z,
+        r: child.userData.radius || 1
+      });
+    }
+  });
+}
+
+function updateChunks(px, pz) {
+  const cx = Math.round(px / CHUNK_SIZE);
+  const cz = Math.round(pz / CHUNK_SIZE);
+
+  for (let dx = -CHUNK_RANGE; dx <= CHUNK_RANGE; dx++) {
+    for (let dz = -CHUNK_RANGE; dz <= CHUNK_RANGE; dz++) {
+      const key = chunkKey(cx + dx, cz + dz);
+      if (!chunks.has(key)) buildChunk(cx + dx, cz + dz);
+    }
+  }
+
+  // Remove far chunks
+  for (const [key, grp] of chunks.entries()) {
+    const [kcx, kcz] = key.split(',').map(Number);
+    if (Math.abs(kcx - cx) > CHUNK_RANGE + 1 || Math.abs(kcz - cz) > CHUNK_RANGE + 1) {
+      scene.remove(grp);
+      // dispose
+      grp.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+      chunks.delete(key);
+    }
+  }
+}
+
+// ── VEHICLE ─────────────────────────────────────────────────────────────────
+function buildVehicle() {
+  const group = new THREE.Group();
+
+  // Main body — boxy SUV
+  const bodyGeo = new THREE.BoxGeometry(2.1, 0.9, 4.2);
+  const body = new THREE.Mesh(bodyGeo, MAT.carBody);
+  body.position.y = 0.45;
+  body.castShadow = true;
+  group.add(body);
+
+  // Cabin
+  const cabinGeo = new THREE.BoxGeometry(1.85, 0.75, 2.2);
+  const cabin = new THREE.Mesh(cabinGeo, MAT.carRoof);
+  cabin.position.set(0, 1.1, -0.2);
+  cabin.castShadow = true;
+  group.add(cabin);
+
+  // Windshield
+  const windGeo = new THREE.BoxGeometry(1.7, 0.6, 0.08);
+  const wind = new THREE.Mesh(windGeo, MAT.carGlass);
+  wind.position.set(0, 1.12, 0.91);
+  wind.rotation.x = 0.35;
+  group.add(wind);
+
+  // Rear window
+  const rearGeo = new THREE.BoxGeometry(1.7, 0.6, 0.08);
+  const rear = new THREE.Mesh(rearGeo, MAT.carGlass);
+  rear.position.set(0, 1.12, -1.31);
+  rear.rotation.x = -0.35;
+  group.add(rear);
+
+  // Side windows
+  [-0.93, 0.93].forEach(sx => {
+    const sg = new THREE.BoxGeometry(0.08, 0.48, 1.6);
+    const sm = new THREE.Mesh(sg, MAT.carGlass);
+    sm.position.set(sx, 1.1, -0.2);
+    group.add(sm);
+  });
+
+  // Undercarriage
+  const ug = new THREE.BoxGeometry(1.8, 0.2, 3.8);
+  const um = new THREE.Mesh(ug, MAT.undercarriage);
+  um.position.y = -0.1;
+  group.add(um);
+
+  // Roof rack
+  const rrg = new THREE.BoxGeometry(1.6, 0.08, 1.8);
+  const rrm = new THREE.Mesh(rrg, MAT.undercarriage);
+  rrm.position.set(0, 1.52, -0.2);
+  group.add(rrm);
+
+  // Bull bar
+  const bbg = new THREE.BoxGeometry(2.1, 0.5, 0.12);
+  const bbm = new THREE.Mesh(bbg, MAT.undercarriage);
+  bbm.position.set(0, 0.4, 2.1);
+  group.add(bbm);
+
+  // Exhaust
+  const exg = new THREE.CylinderGeometry(0.07, 0.07, 0.5, 6);
+  const exm = new THREE.Mesh(exg, MAT.exhaust);
+  exm.rotation.z = Math.PI / 2;
+  exm.position.set(-1.1, 0.2, -1.8);
+  group.add(exm);
+
+  // WHEELS
+  const wheels = [];
+  const wheelPositions = [
+    [-1.1, 0, 1.35],  // FL
+    [ 1.1, 0, 1.35],  // FR
+    [-1.1, 0, -1.35], // RL
+    [ 1.1, 0, -1.35], // RR
+  ];
+  wheelPositions.forEach((pos, i) => {
+    const wg = new THREE.Group();
+    const tire = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.42, 0.32, 12),
+      MAT.wheel
+    );
+    tire.rotation.z = Math.PI / 2;
+    wg.add(tire);
+
+    const hub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.36, 5),
+      MAT.wheelHub
+    );
+    hub.rotation.z = Math.PI / 2;
+    wg.add(hub);
+
+    wg.position.set(...pos);
+    group.add(wg);
+    wheels.push(wg);
+  });
+
+  // Headlights
+  [-0.7, 0.7].forEach(x => {
+    const hlg = new THREE.BoxGeometry(0.35, 0.2, 0.08);
+    const hlm = new THREE.Mesh(hlg, new THREE.MeshLambertMaterial({ color: 0xffffee, emissive: 0xffff88, emissiveIntensity: 0.5 }));
+    hlm.position.set(x, 0.55, 2.12);
+    group.add(hlm);
+  });
+
+  group.castShadow = true;
+  return { group, wheels };
+}
+
+const { group: car, wheels } = buildVehicle();
+scene.add(car);
+
+// ── VEHICLE PHYSICS ──────────────────────────────────────────────────────────
+const physics = {
+  pos: new THREE.Vector3(0, 0, 0),
+  vel: new THREE.Vector3(),
+  heading: 0,        // radians, car faces +Z local
+  speed: 0,          // m/s
+  steerAngle: 0,
+  wheelRot: 0,
+  health: 100,
+  nitro: 100,
+  crashed: false,
+  distance: 0,
+  airborne: false,
+  airY: 0,
+  vertVel: 0,
+  // Vehicle Dimensions for suspension logic
+  WHEEL_BASE: 2.7,
+  TRACK_WIDTH: 2.2
+};
+
+const KEYS = {};
+document.addEventListener('keydown', e => { KEYS[e.code] = true; });
+document.addEventListener('keyup', e => { KEYS[e.code] = false; });
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'KeyR') respawn();
+});
+
+function respawn() {
+  physics.pos.set(0, 0, 0);
+  physics.vel.set(0, 0, 0);
+  physics.speed = 0;
+  physics.heading = 0;
+  physics.health = 100;
+  physics.nitro = 100;
+  physics.crashed = false;
+  physics.distance = 0;
+  document.getElementById('crash-msg').style.display = 'none';
+}
+
+// Suspension targets per wheel (world Y)
+const suspY = [0, 0, 0, 0];
+const WHEEL_OFFSETS = [
+  new THREE.Vector3(-1.1, 0, 1.35),
+  new THREE.Vector3( 1.1, 0, 1.35),
+  new THREE.Vector3(-1.1, 0, -1.35),
+  new THREE.Vector3( 1.1, 0, -1.35),
+];
+
+function getObstaclesNear(x, z, radius) {
+  const cx = Math.round(x / CHUNK_SIZE);
+  const cz = Math.round(z / CHUNK_SIZE);
+  const result = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const grp = chunks.get(chunkKey(cx + dx, cz + dz));
+      if (grp && grp.userData.obstacles) {
+        grp.userData.obstacles.forEach(o => {
+          const dist = Math.sqrt((o.wx - x) ** 2 + (o.wz - z) ** 2);
+          if (dist < radius + o.r + 2) result.push(o);
+        });
+      }
+    }
+  }
+  return result;
+}
+
+// ── DUST PARTICLES ─────────────────────────────────────────────────────────
+const DUST_COUNT = 120;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(DUST_COUNT * 3);
+const dustLife = new Float32Array(DUST_COUNT);
+const dustVel = [];
+for (let i = 0; i < DUST_COUNT; i++) {
+  dustPos[i * 3] = 9999;
+  dustPos[i * 3 + 1] = 9999;
+  dustPos[i * 3 + 2] = 9999;
+  dustLife[i] = 0;
+  dustVel.push(new THREE.Vector3());
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dustMat = new THREE.PointsMaterial({
+  color: 0xc8a86a, size: 1.2, transparent: true, opacity: 0.5,
+  sizeAttenuation: true, depthWrite: false
+});
+const dustSystem = new THREE.Points(dustGeo, dustMat);
+scene.add(dustSystem);
+
+let dustIndex = 0;
+function spawnDust(x, y, z, speed) {
+  const i = dustIndex % DUST_COUNT;
+  dustIndex++;
+  dustPos[i * 3] = x;
+  dustPos[i * 3 + 1] = y;
+  dustPos[i * 3 + 2] = z;
+  dustLife[i] = 1.0;
+  const spread = 0.5 + speed * 0.1;
+  dustVel[i].set(
+    (Math.random() - 0.5) * spread,
+    Math.random() * 1.5 + 0.5,
+    (Math.random() - 0.5) * spread
+  );
+}
+
+function updateDust(dt) {
+  for (let i = 0; i < DUST_COUNT; i++) {
+    if (dustLife[i] > 0) {
+      dustLife[i] -= dt * 1.2;
+      dustPos[i * 3] += dustVel[i].x * dt;
+      dustPos[i * 3 + 1] += dustVel[i].y * dt;
+      dustPos[i * 3 + 2] += dustVel[i].z * dt;
+      dustVel[i].y -= 2 * dt;
+    } else {
+      dustPos[i * 3] = 9999;
+    }
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+}
+
+// ── CAMERA ─────────────────────────────────────────────────────────────────
+const camOffset = new THREE.Vector3(0, 5.5, -12);
+const camLookAhead = new THREE.Vector3(0, 1.5, 8);
+let camPos = new THREE.Vector3();
+let camTarget = new THREE.Vector3();
+
+// Reusable vectors to prevent GC pressure
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+
+// ── GAME LOOP ───────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+let totalTime = 0;
+
+// HUD elements
+const speedEl = document.getElementById('speed-num');
+const gearEl = document.getElementById('gear-num');
+const damageEl = document.getElementById('damage-bar');
+const nitroEl = document.getElementById('nitro-bar');
+const distEl = document.getElementById('dist-num');
+const crashMsg = document.getElementById('crash-msg');
+
+function getGear(speed) {
+  const s = Math.abs(speed) * 3.6;
+  if (s < 15) return 1;
+  if (s < 35) return 2;
+  if (s < 60) return 3;
+  if (s < 90) return 4;
+  return 5;
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  totalTime += dt;
+
+  if (!physics.crashed) {
+    // ── INPUT ──
+    const throttle = (KEYS['KeyW'] || KEYS['ArrowUp']) ? 1 : 0;
+    const brake = (KEYS['KeyS'] || KEYS['ArrowDown']) ? 1 : 0;
+    const left = (KEYS['KeyA'] || KEYS['ArrowLeft']) ? 1 : 0;
+    const right = (KEYS['KeyD'] || KEYS['ArrowRight']) ? 1 : 0;
+    const nitroOn = (KEYS['ShiftLeft'] || KEYS['ShiftRight']) && physics.nitro > 0;
+
+    // Nitro
+    if (nitroOn) {
+      physics.nitro = Math.max(0, physics.nitro - dt * 22);
+    } else {
+      physics.nitro = Math.min(100, physics.nitro + dt * 8);
+    }
+
+    // ── PHYSICS ──
+    const maxSpeed = nitroOn ? 38 : 26;
+    const accel = nitroOn ? 28 : 16;
+    const brakeForce = 22;
+    const drag = 0.96;
+
+    if (throttle) {
+      physics.speed += accel * dt;
+    }
+    if (brake) {
+      if (physics.speed > 0) physics.speed -= brakeForce * dt;
+      else physics.speed -= accel * 0.5 * dt;
+    }
+    if (!throttle && !brake) {
+      physics.speed *= Math.pow(drag, dt * 60);
+    }
+    physics.speed = Math.max(-10, Math.min(maxSpeed, physics.speed));
+
+    // Steering
+    const steerRate = 1.8 - Math.min(1.2, Math.abs(physics.speed) / maxSpeed * 1.2);
+    const steerTarget = (right - left) * steerRate;
+    physics.steerAngle += (steerTarget - physics.steerAngle) * dt * 6;
+
+    if (Math.abs(physics.speed) > 0.2) {
+      physics.heading += physics.steerAngle * physics.speed * dt * 0.45;
+    }
+
+    // Move
+    const dx = Math.sin(physics.heading) * physics.speed * dt;
+    const dz = Math.cos(physics.heading) * physics.speed * dt;
+    physics.pos.x += dx;
+    physics.pos.z += dz;
+
+    // Terrain follow
+    const groundY = getTerrainY(physics.pos.x, physics.pos.z);
+    const targetY = groundY;
+
+    // Simple "suspension" — smooth Y
+    physics.pos.y += (targetY - physics.pos.y) * dt * 12;
+
+    // Per-wheel suspension for visual tilt
+    const sinH = Math.sin(physics.heading);
+    const cosH = Math.cos(physics.heading);
+    WHEEL_OFFSETS.forEach((offset, i) => {
+      const wx = physics.pos.x + offset.x * cosH + offset.z * sinH;
+      const wz = physics.pos.z - offset.x * sinH + offset.z * cosH;
+      suspY[i] = getTerrainY(wx, wz);
+    });
+
+    // Compute pitch and roll from suspension
+    const frontY = (suspY[0] + suspY[1]) * 0.5;
+    const rearY = (suspY[2] + suspY[3]) * 0.5;
+    const leftY = (suspY[0] + suspY[2]) * 0.5;
+    const rightY = (suspY[1] + suspY[3]) * 0.5;
+
+    const pitchAngle = Math.atan2(frontY - rearY, physics.WHEEL_BASE) * 0.9;
+    const rollAngle = Math.atan2(rightY - leftY, physics.TRACK_WIDTH) * 0.9;
+
+    // COLLISION vs obstacles
+    const obstacles = getObstaclesNear(physics.pos.x, physics.pos.z, 4);
+    for (const o of obstacles) {
+      const ddx = physics.pos.x - o.wx;
+      const ddz = physics.pos.z - o.wz;
+      const dist = Math.sqrt(ddx * ddx + ddz * ddz);
+      const minDist = o.r + 1.2;
+      if (dist < minDist && dist > 0.01) {
+        const impact = Math.abs(physics.speed);
+        if (impact > 3) {
+          physics.health -= impact * 0.8 * dt * 30;
+          physics.health = Math.max(0, physics.health);
+        }
+        const nx = ddx / dist;
+        const nz = ddz / dist;
+        const pen = minDist - dist;
+        physics.pos.x += nx * pen;
+        physics.pos.z += nz * pen;
+        // Bounce
+        const dot = physics.speed * (nx * sinH + nz * cosH);
+        physics.speed -= dot * 1.5;
+        physics.speed *= 0.6;
+      }
+    }
+
+    if (physics.health <= 0) {
+      physics.crashed = true;
+      crashMsg.style.display = 'block';
+    }
+
+    // Wheel spin
+    physics.wheelRot += physics.speed * dt * 2.4;
+    wheels.forEach((w, i) => {
+      // all wheels spin
+      w.rotation.x = physics.wheelRot;
+      // front wheels steer
+      if (i < 2) w.rotation.y = -physics.steerAngle * 0.5;
+      // place wheel on ground
+      const targetWY = suspY[i] - physics.pos.y;
+      w.position.y += (targetWY - w.position.y) * dt * 15;
+      w.position.y = Math.max(-0.6, Math.min(0.6, w.position.y));
+    });
+
+    // Apply transforms
+    car.position.copy(physics.pos);
+    car.rotation.y = physics.heading;
+    car.rotation.x = pitchAngle;
+    car.rotation.z = -rollAngle;
+
+    // Dust
+    const speedAbs = Math.abs(physics.speed);
+    if (speedAbs > 2 && totalTime % 0.06 < dt + 0.015) {
+      spawnDust(
+        physics.pos.x - sinH * 2.2 + (Math.random() - 0.5),
+        physics.pos.y + 0.15,
+        physics.pos.z - cosH * 2.2 + (Math.random() - 0.5),
+        speedAbs
+      );
+    }
+
+    physics.distance += speedAbs * dt;
+
+    // Sun follows player
+    sun.position.set(physics.pos.x + 60, 90, physics.pos.z + 40);
+    sun.target.position.copy(physics.pos);
+    sun.target.updateMatrixWorld();
+  }
+
+  updateDust(dt);
+  updateChunks(physics.pos.x, physics.pos.z);
+
+  // ── CAMERA ──
+  const sinH = Math.sin(physics.heading);
+  const cosH = Math.cos(physics.heading);
+  const speedT = Math.abs(physics.speed) / 26;
+
+  // Camera lags slightly behind - Using frame-rate independent lerp
+  _v1.set(
+    physics.pos.x - sinH * (11 + speedT * 3),
+    physics.pos.y + 5.5 + speedT * 1.5,
+    physics.pos.z - cosH * (11 + speedT * 3)
+  );
+  camPos.lerp(_v1, 1 - Math.exp(-5 * dt));
+  camera.position.copy(camPos);
+
+  _v2.set(
+    physics.pos.x + sinH * 6,
+    physics.pos.y + 1.8,
+    physics.pos.z + cosH * 6
+  );
+  camTarget.lerp(_v2, 1 - Math.exp(-7 * dt));
+  camera.lookAt(camTarget);
+
+  // ── HUD ──
+  const kmh = Math.round(Math.abs(physics.speed) * 3.6);
+  speedEl.textContent = kmh;
+  gearEl.textContent = physics.speed < -0.5 ? 'R' : getGear(physics.speed);
+  damageEl.style.width = physics.health + '%';
+  damageEl.style.background = physics.health > 60 ? '#4caf50' : physics.health > 30 ? '#f4a940' : '#ff4422';
+  nitroEl.style.width = physics.nitro + '%';
+  distEl.textContent = Math.round(physics.distance) + ' m';
+
+  renderer.render(scene, camera);
+}
+
+// Initial chunk load
+updateChunks(0, 0);
+// Start car above ground
+physics.pos.y = getTerrainY(0, 0) + 0.5;
+camPos.set(0, 7, -14);
+
+tick();
+</script>
+</body>
+</html>
