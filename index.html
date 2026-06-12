@@ -695,9 +695,9 @@ function tick() {
 
   // Camera lags slightly behind - Using frame-rate independent lerp
   _v1.set(
-    physics.pos.x - sinH * (11 + speedT * 3),
-    physics.pos.y + 5.5 + speedT * 1.5,
-    physics.pos.z - cosH * (11 + speedT * 3)
+    physics.pos.x - sinH * (15 + speedT * 5),
+    physics.pos.y + 7.5 + speedT * 2.5,
+    physics.pos.z - cosH * (15 + speedT * 5)
   );
   camPos.lerp(_v1, 1 - Math.exp(-5 * dt));
   camera.position.copy(camPos);
