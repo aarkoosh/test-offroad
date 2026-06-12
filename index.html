@@ -7,121 +7,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0a0705; overflow: hidden; font-family: 'Courier New', monospace; }
   #c { display: block; width: 100vw; height: 100vh; }
-  #hud {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 10;
-  }
-  #speed-panel {
-    position: absolute; bottom: 32px; right: 36px;
-    color: #f4a940; text-align: right;
-  }
-  #speed-num {
-    font-size: 72px; font-weight: 900; line-height: 1;
-    text-shadow: 0 0 30px #f4a94088;
-    letter-spacing: -2px;
-  }
-  #speed-unit { font-size: 13px; letter-spacing: 4px; opacity: .6; margin-top: 2px; }
-  #gear-panel {
-    position: absolute; bottom: 32px; left: 36px;
-    color: #e8dcc8;
-  }
-  #gear-label { font-size: 11px; letter-spacing: 3px; opacity: .5; margin-bottom: 4px; }
-  #gear-num { font-size: 48px; font-weight: 900; color: #f4a940; text-shadow: 0 0 20px #f4a94066; }
-  #title-bar {
-    position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
-    color: #e8dcc8; letter-spacing: 8px; font-size: 13px; opacity: .45;
-    text-transform: uppercase;
-  }
-  #controls-hint {
-    position: absolute; top: 24px; left: 28px;
-    color: #e8dcc8; font-size: 10px; letter-spacing: 2px; opacity: .4;
-    line-height: 1.9;
-  }
-  #damage-bar-wrap {
-    position: absolute; bottom: 110px; right: 36px;
-    width: 140px;
-  }
-  #damage-label { font-size: 10px; letter-spacing: 3px; color: #e8dcc8; opacity: .45; margin-bottom: 5px; text-align: right; }
-  #damage-bar-bg {
-    height: 6px; background: #2a2015; border-radius: 3px; overflow: hidden;
-  }
-  #damage-bar {
-    height: 100%; width: 100%; background: #4caf50;
-    border-radius: 3px; transition: background .3s;
-  }
-  #nitro-bar-wrap {
-    position: absolute; bottom: 80px; right: 36px;
-    width: 140px;
-  }
-  #nitro-label { font-size: 10px; letter-spacing: 3px; color: #e8dcc8; opacity: .45; margin-bottom: 5px; text-align: right; }
-  #nitro-bar-bg {
-    height: 6px; background: #2a2015; border-radius: 3px; overflow: hidden;
-  }
-  #nitro-bar {
-    height: 100%; width: 100%; background: #00cfff;
-    border-radius: 3px;
-  }
-  #dist-panel {
-    position: absolute; top: 24px; right: 36px;
-    color: #e8dcc8; text-align: right;
-    font-size: 11px; letter-spacing: 2px; opacity: .5;
-  }
-  #dist-num { font-size: 22px; font-weight: 700; color: #f4a940; opacity: 1; }
-  #crash-msg {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #ff4422; font-size: 42px; font-weight: 900; letter-spacing: 6px;
-    text-shadow: 0 0 40px #ff442288;
-    display: none; text-align: center;
-  }
-  #crash-sub {
-    font-size: 13px; letter-spacing: 4px; color: #e8dcc8;
-    margin-top: 12px; opacity: .7;
-  }
-  .vignette {
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse at center, transparent 55%, #0a070588 100%);
-    pointer-events: none;
-  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hud">
-  <div class="vignette"></div>
-  <div id="title-bar">DESERT RAGE</div>
-  <div id="controls-hint">
-    W / ↑ &nbsp; THROTTLE<br>
-    S / ↓ &nbsp; BRAKE<br>
-    A / ← &nbsp; STEER LEFT<br>
-    D / → &nbsp; STEER RIGHT<br>
-    SHIFT &nbsp; NITRO<br>
-    R &nbsp;&nbsp;&nbsp;&nbsp; RESPAWN
-  </div>
-  <div id="dist-panel">
-    <div>DISTANCE</div>
-    <div id="dist-num">0 m</div>
-  </div>
-  <div id="gear-panel">
-    <div id="gear-label">GEAR</div>
-    <div id="gear-num">1</div>
-  </div>
-  <div id="speed-panel">
-    <div id="speed-num">0</div>
-    <div id="speed-unit">KM/H</div>
-  </div>
-  <div id="damage-bar-wrap">
-    <div id="damage-label">HEALTH</div>
-    <div id="damage-bar-bg"><div id="damage-bar"></div></div>
-  </div>
-  <div id="nitro-bar-wrap">
-    <div id="nitro-label">NITRO</div>
-    <div id="nitro-bar-bg"><div id="nitro-bar"></div></div>
-  </div>
-  <div id="crash-msg">
-    WRECKED<br>
-    <div id="crash-sub">PRESS R TO RESPAWN</div>
-  </div>
-</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -216,7 +105,9 @@ function buildGroundPatch(cx, cz) {
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + cx * CHUNK_SIZE;
-    const wz = pos.getZ(i) + cz * CHUNK_SIZE;
+    // rotateX(-PI/2) maps local Y to world -Z.
+    // Therefore, the correct world Z for sampling is (chunkCenterZ - localY).
+    const wz = cz * CHUNK_SIZE - pos.getY(i);
     pos.setZ(i, getTerrainY(wx, wz)); // plane is XY, rotate later
   }
   geo.rotateX(-Math.PI / 2);
@@ -225,7 +116,6 @@ function buildGroundPatch(cx, cz) {
   const rng = seededRand(cx * 31337 + cz * 7331 + 42);
   const mat = rng() > 0.4 ? MAT.sand : MAT.sandDark;
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -247,7 +137,7 @@ function makeRock(rng) {
   return mesh;
 }
 
-function makeBush(rng) {
+function makeShrub(rng) {
   const group = new THREE.Group();
   const spheres = 2 + Math.floor(rng() * 3);
   for (let i = 0; i < spheres; i++) {
@@ -262,6 +152,10 @@ function makeBush(rng) {
   group.userData.isObstacle = true;
   group.userData.radius = 0.9;
   return group;
+}
+
+function makeBush(rng) {
+  return makeShrub(rng);
 }
 
 function makeCactus(rng) {
@@ -284,27 +178,43 @@ function makeCactus(rng) {
   return group;
 }
 
+function pickProceduralProp(rng, slope) {
+  // Flatter ground favors shrubs; rougher ground favors rocks.
+  if (slope > 0.75) {
+    return rng() < 0.7 ? makeRock(rng) : (rng() < 0.5 ? makeCactus(rng) : makeShrub(rng));
+  }
+  if (slope > 0.35) {
+    const t = rng();
+    if (t < 0.5) return makeRock(rng);
+    if (t < 0.8) return makeShrub(rng);
+    return makeCactus(rng);
+  }
+  const t = rng();
+  if (t < 0.45) return makeShrub(rng);
+  if (t < 0.7) return makeRock(rng);
+  return makeCactus(rng);
+}
+
 function buildChunk(cx, cz) {
   const group = new THREE.Group();
   const ground = buildGroundPatch(cx, cz);
   group.add(ground);
 
   const rng = seededRand(cx * 99991 + cz * 39989 + 123);
-  const count = 8 + Math.floor(rng() * 14);
+  const count = 10 + Math.floor(rng() * 18);
   for (let i = 0; i < count; i++) {
     const lx = (rng() - 0.5) * CHUNK_SIZE;
     const lz = (rng() - 0.5) * CHUNK_SIZE;
     const wx = cx * CHUNK_SIZE + lx;
     const wz = cz * CHUNK_SIZE + lz;
     const y = getTerrainY(wx, wz);
+    const slope = Math.abs(getTerrainY(wx + 3, wz) - getTerrainY(wx - 3, wz)) +
+                  Math.abs(getTerrainY(wx, wz + 3) - getTerrainY(wx, wz - 3));
 
-    let obj;
-    const t = rng();
-    if (t < 0.35) obj = makeRock(rng);
-    else if (t < 0.70) obj = makeBush(rng);
-    else obj = makeCactus(rng);
+    const obj = pickProceduralProp(rng, slope);
 
     obj.position.set(lx, y, lz);
+    obj.rotation.y += (rng() - 0.5) * 0.8;
     group.add(obj);
   }
 
@@ -424,15 +334,31 @@ function buildVehicle() {
   ];
   wheelPositions.forEach((pos, i) => {
     const wg = new THREE.Group();
+    const tread = new THREE.Group();
+    const treadCount = 10;
+    for (let t = 0; t < treadCount; t++) {
+      const angle = (t / treadCount) * Math.PI * 2;
+      const lug = new THREE.Mesh(
+        new THREE.BoxGeometry(0.44, 0.08, 0.18),
+        MAT.wheel
+      );
+      // Wheel axle runs along X, so lugs need to wrap around the Y/Z plane.
+      lug.position.set(0, Math.cos(angle) * 0.56, Math.sin(angle) * 0.56);
+      lug.rotation.x = Math.PI / 2;
+      lug.rotation.y = angle;
+      tread.add(lug);
+    }
+
     const tire = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.42, 0.42, 0.32, 12),
+      new THREE.CylinderGeometry(0.56, 0.56, 0.44, 16),
       MAT.wheel
     );
     tire.rotation.z = Math.PI / 2;
     wg.add(tire);
+    wg.add(tread);
 
     const hub = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.18, 0.36, 5),
+      new THREE.CylinderGeometry(0.22, 0.22, 0.46, 5),
       MAT.wheelHub
     );
     hub.rotation.z = Math.PI / 2;
@@ -466,13 +392,14 @@ const physics = {
   speed: 0,          // m/s
   steerAngle: 0,
   wheelRot: 0,
-  health: 100,
   nitro: 100,
   crashed: false,
   distance: 0,
   airborne: false,
   airY: 0,
   vertVel: 0,
+  suspension: [0, 0, 0, 0],
+  suspensionVel: [0, 0, 0, 0],
   // Vehicle Dimensions for suspension logic
   WHEEL_BASE: 2.7,
   TRACK_WIDTH: 2.2
@@ -491,11 +418,14 @@ function respawn() {
   physics.vel.set(0, 0, 0);
   physics.speed = 0;
   physics.heading = 0;
-  physics.health = 100;
+  physics.steerAngle = 0;
+  physics.wheelRot = 0;
   physics.nitro = 100;
   physics.crashed = false;
   physics.distance = 0;
-  document.getElementById('crash-msg').style.display = 'none';
+  physics.suspension.fill(0);
+  physics.suspensionVel.fill(0);
+  physics.pos.y = getTerrainY(0, 0) + 0.5;
 }
 
 // Suspension targets per wheel (world Y)
@@ -592,14 +522,6 @@ const _v3 = new THREE.Vector3();
 const clock = new THREE.Clock();
 let totalTime = 0;
 
-// HUD elements
-const speedEl = document.getElementById('speed-num');
-const gearEl = document.getElementById('gear-num');
-const damageEl = document.getElementById('damage-bar');
-const nitroEl = document.getElementById('nitro-bar');
-const distEl = document.getElementById('dist-num');
-const crashMsg = document.getElementById('crash-msg');
-
 function getGear(speed) {
   const s = Math.abs(speed) * 3.6;
   if (s < 15) return 1;
@@ -621,6 +543,7 @@ function tick() {
     const left = (KEYS['KeyA'] || KEYS['ArrowLeft']) ? 1 : 0;
     const right = (KEYS['KeyD'] || KEYS['ArrowRight']) ? 1 : 0;
     const nitroOn = (KEYS['ShiftLeft'] || KEYS['ShiftRight']) && physics.nitro > 0;
+    const steerInput = left - right;
 
     // Nitro
     if (nitroOn) {
@@ -633,59 +556,71 @@ function tick() {
     const maxSpeed = nitroOn ? 38 : 26;
     const accel = nitroOn ? 28 : 16;
     const brakeForce = 22;
-    const drag = 0.96;
+    const drag = 0.985;
 
-    if (throttle) {
-      physics.speed += accel * dt;
-    }
-    if (brake) {
-      if (physics.speed > 0) physics.speed -= brakeForce * dt;
-      else physics.speed -= accel * 0.5 * dt;
-    }
-    if (!throttle && !brake) {
-      physics.speed *= Math.pow(drag, dt * 60);
-    }
-    physics.speed = Math.max(-10, Math.min(maxSpeed, physics.speed));
+    // Split motion into forward and sideways travel for a simple traction model.
+    const sinH = Math.sin(physics.heading);
+    const cosH = Math.cos(physics.heading);
+    const forward = _v1.set(sinH, 0, cosH);
+    const rightVec = _v2.set(cosH, 0, -sinH);
 
-    // Steering
-    const steerRate = 1.8 - Math.min(1.2, Math.abs(physics.speed) / maxSpeed * 1.2);
-    const steerTarget = (right - left) * steerRate;
-    physics.steerAngle += (steerTarget - physics.steerAngle) * dt * 6;
+    let forwardSpeed = physics.vel.dot(forward);
+    let lateralSpeed = physics.vel.dot(rightVec);
 
-    if (Math.abs(physics.speed) > 0.2) {
-      physics.heading += physics.steerAngle * physics.speed * dt * 0.45;
+    if (throttle) forwardSpeed += accel * dt;
+    if (brake) forwardSpeed -= brakeForce * dt;
+    if (!throttle && !brake) forwardSpeed *= Math.pow(drag, dt * 60);
+
+    forwardSpeed = THREE.MathUtils.clamp(forwardSpeed, -10, maxSpeed);
+
+    physics.steerAngle += (steerInput - physics.steerAngle) * (1 - Math.exp(-8 * dt));
+    if (Math.abs(forwardSpeed) > 0.1) {
+      const speedFactor = Math.min(1, Math.abs(forwardSpeed) / maxSpeed);
+      const turnDir = forwardSpeed >= 0 ? 1 : -1;
+      physics.heading += physics.steerAngle * (0.9 + speedFactor) * dt * 1.8 * turnDir;
     }
 
-    // Move
-    const dx = Math.sin(physics.heading) * physics.speed * dt;
-    const dz = Math.cos(physics.heading) * physics.speed * dt;
-    physics.pos.x += dx;
-    physics.pos.z += dz;
+    // Side grip keeps the car from skating forever while still allowing a bit of drift.
+    const grip = THREE.MathUtils.lerp(14, 5, Math.min(1, Math.abs(forwardSpeed) / maxSpeed));
+    lateralSpeed *= Math.max(0, 1 - grip * dt);
+
+    physics.vel.copy(forward).multiplyScalar(forwardSpeed).addScaledVector(rightVec, lateralSpeed);
+    physics.pos.addScaledVector(physics.vel, dt);
+    physics.speed = forwardSpeed;
 
     // Terrain follow
     const groundY = getTerrainY(physics.pos.x, physics.pos.z);
-    const targetY = groundY;
-
-    // Simple "suspension" — smooth Y
+    const targetY = groundY + 0.35;
     physics.pos.y += (targetY - physics.pos.y) * dt * 12;
 
     // Per-wheel suspension for visual tilt
-    const sinH = Math.sin(physics.heading);
-    const cosH = Math.cos(physics.heading);
     WHEEL_OFFSETS.forEach((offset, i) => {
       const wx = physics.pos.x + offset.x * cosH + offset.z * sinH;
       const wz = physics.pos.z - offset.x * sinH + offset.z * cosH;
       suspY[i] = getTerrainY(wx, wz);
     });
 
-    // Compute pitch and roll from suspension
-    const frontY = (suspY[0] + suspY[1]) * 0.5;
-    const rearY = (suspY[2] + suspY[3]) * 0.5;
-    const leftY = (suspY[0] + suspY[2]) * 0.5;
-    const rightY = (suspY[1] + suspY[3]) * 0.5;
+    const SUSP_TRAVEL = 0.55;
+    const SUSP_STIFFNESS = 26;
+    const SUSP_DAMPING = 8;
+    const bodyBob = [];
+    for (let i = 0; i < 4; i++) {
+      const rawTarget = THREE.MathUtils.clamp((suspY[i] - physics.pos.y) * 0.5, -0.55, 0.2);
+      physics.suspensionVel[i] += (rawTarget - physics.suspension[i]) * SUSP_STIFFNESS * dt;
+      physics.suspensionVel[i] *= Math.exp(-SUSP_DAMPING * dt);
+      physics.suspension[i] += physics.suspensionVel[i] * dt;
+      physics.suspension[i] = THREE.MathUtils.clamp(physics.suspension[i], -SUSP_TRAVEL, SUSP_TRAVEL);
+      bodyBob.push(physics.suspension[i]);
+    }
 
-    const pitchAngle = Math.atan2(frontY - rearY, physics.WHEEL_BASE) * 0.9;
-    const rollAngle = Math.atan2(rightY - leftY, physics.TRACK_WIDTH) * 0.9;
+    // Compute pitch and roll from suspension travel
+    const frontY = (bodyBob[0] + bodyBob[1]) * 0.5;
+    const rearY = (bodyBob[2] + bodyBob[3]) * 0.5;
+    const leftY = (bodyBob[0] + bodyBob[2]) * 0.5;
+    const rightY = (bodyBob[1] + bodyBob[3]) * 0.5;
+
+    const pitchAngle = Math.atan2(frontY - rearY, physics.WHEEL_BASE) * 1.2;
+    const rollAngle = Math.atan2(rightY - leftY, physics.TRACK_WIDTH) * 1.2;
 
     // COLLISION vs obstacles
     const obstacles = getObstaclesNear(physics.pos.x, physics.pos.z, 4);
@@ -695,59 +630,54 @@ function tick() {
       const dist = Math.sqrt(ddx * ddx + ddz * ddz);
       const minDist = o.r + 1.2;
       if (dist < minDist && dist > 0.01) {
-        const impact = Math.abs(physics.speed);
-        if (impact > 3) {
-          physics.health -= impact * 0.8 * dt * 30;
-          physics.health = Math.max(0, physics.health);
-        }
         const nx = ddx / dist;
         const nz = ddz / dist;
         const pen = minDist - dist;
         physics.pos.x += nx * pen;
         physics.pos.z += nz * pen;
-        // Bounce
-        const dot = physics.speed * (nx * sinH + nz * cosH);
-        physics.speed -= dot * 1.5;
-        physics.speed *= 0.6;
+        const impact = Math.max(0, -(physics.vel.x * nx + physics.vel.z * nz));
+        if (impact > 0) {
+          physics.vel.x += nx * impact * 1.7;
+          physics.vel.z += nz * impact * 1.7;
+        }
+        physics.vel.multiplyScalar(0.65);
+        forwardSpeed = physics.vel.dot(forward);
+        lateralSpeed = physics.vel.dot(rightVec);
       }
     }
 
-    if (physics.health <= 0) {
-      physics.crashed = true;
-      crashMsg.style.display = 'block';
-    }
+    physics.speed = physics.vel.dot(forward);
 
     // Wheel spin
+    const travelSpeed = physics.vel.length();
     physics.wheelRot += physics.speed * dt * 2.4;
     wheels.forEach((w, i) => {
       // all wheels spin
       w.rotation.x = physics.wheelRot;
       // front wheels steer
-      if (i < 2) w.rotation.y = -physics.steerAngle * 0.5;
-      // place wheel on ground
-      const targetWY = suspY[i] - physics.pos.y;
-      w.position.y += (targetWY - w.position.y) * dt * 15;
-      w.position.y = Math.max(-0.6, Math.min(0.6, w.position.y));
+      if (i < 2) w.rotation.y = physics.steerAngle * 0.5;
+      // springy suspension travel
+      w.position.y = physics.suspension[i];
     });
 
     // Apply transforms
     car.position.copy(physics.pos);
+    car.position.y += (bodyBob[0] + bodyBob[1] + bodyBob[2] + bodyBob[3]) * 0.06;
     car.rotation.y = physics.heading;
-    car.rotation.x = pitchAngle;
-    car.rotation.z = -rollAngle;
+    car.rotation.x = -pitchAngle;
+    car.rotation.z = rollAngle;
 
     // Dust
-    const speedAbs = Math.abs(physics.speed);
-    if (speedAbs > 2 && totalTime % 0.06 < dt + 0.015) {
+    if (travelSpeed > 2 && totalTime % 0.06 < dt + 0.015) {
       spawnDust(
         physics.pos.x - sinH * 2.2 + (Math.random() - 0.5),
         physics.pos.y + 0.15,
         physics.pos.z - cosH * 2.2 + (Math.random() - 0.5),
-        speedAbs
+        travelSpeed
       );
     }
 
-    physics.distance += speedAbs * dt;
+    physics.distance += travelSpeed * dt;
 
     // Sun follows player
     sun.position.set(physics.pos.x + 60, 90, physics.pos.z + 40);
@@ -779,15 +709,6 @@ function tick() {
   );
   camTarget.lerp(_v2, 1 - Math.exp(-7 * dt));
   camera.lookAt(camTarget);
-
-  // ── HUD ──
-  const kmh = Math.round(Math.abs(physics.speed) * 3.6);
-  speedEl.textContent = kmh;
-  gearEl.textContent = physics.speed < -0.5 ? 'R' : getGear(physics.speed);
-  damageEl.style.width = physics.health + '%';
-  damageEl.style.background = physics.health > 60 ? '#4caf50' : physics.health > 30 ? '#f4a940' : '#ff4422';
-  nitroEl.style.width = physics.nitro + '%';
-  distEl.textContent = Math.round(physics.distance) + ' m';
 
   renderer.render(scene, camera);
 }
