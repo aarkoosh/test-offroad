@@ -493,6 +493,7 @@ function spawnDust(x, y, z, speed) {
 }
 
 function updateDust(dt) {
+  let activeCount = 0;
   for (let i = 0; i < DUST_COUNT; i++) {
     if (dustLife[i] > 0) {
       dustLife[i] -= dt * 1.2;
@@ -500,11 +501,14 @@ function updateDust(dt) {
       dustPos[i * 3 + 1] += dustVel[i].y * dt;
       dustPos[i * 3 + 2] += dustVel[i].z * dt;
       dustVel[i].y -= 2 * dt;
+      activeCount++;
     } else {
       dustPos[i * 3] = 9999;
     }
   }
-  dustGeo.attributes.position.needsUpdate = true;
+  if (activeCount > 0 || totalTime < 1.0) {
+    dustGeo.attributes.position.needsUpdate = true;
+  }
 }
 
 // ── CAMERA ─────────────────────────────────────────────────────────────────
